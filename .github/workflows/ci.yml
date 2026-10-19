@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
 
 concurrency:
@@ -59,7 +59,7 @@ jobs:
         run: ruff format --check .
 
       - name: Pruebas
-        run: pytest -q
+        run: python manage.py test -v 2
 
   frontend:
     name: Frontend (React + Vitest)

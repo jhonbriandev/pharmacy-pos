@@ -63,9 +63,9 @@ origen tambien en desarrollo.
 ## Pruebas
 
 ```powershell
-# Backend (necesita PostgreSQL; usa --reuse-db para no recrear la base)
+# Backend (necesita PostgreSQL; --keepdb reutiliza la base de pruebas)
 cd backend
-pytest --reuse-db
+python manage.py test --keepdb
 
 # Frontend
 cd frontend
@@ -75,7 +75,8 @@ npm run build
 ```
 
 La suite del backend corre con `config.settings.test` (hasher rapido, sin
-throttling, renderer solo JSON). Nunca se prueba contra SQLite.
+throttling, renderer solo JSON); `manage.py test` lo selecciona solo. Nunca se
+prueba contra SQLite.
 
 ## Variables de entorno
 
@@ -224,7 +225,7 @@ movimientos. Cualquier diferencia es un incidente: se investiga en
 ```powershell
 cd backend
 .\\.venv\\Scripts\\python.exe -m pip install --upgrade -r requirements-dev.txt
-pytest --reuse-db
+python manage.py test --keepdb
 .\\.venv\\Scripts\\python.exe -m ruff check .
 
 cd ..\\frontend
