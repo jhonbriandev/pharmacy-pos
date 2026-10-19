@@ -28,6 +28,8 @@ from apps.common.money import unit_cost as round_unit_cost
 from apps.inventory.exceptions import (
     InsufficientStock,
     InvalidConversion,
+    LotBlocked,
+    LotExpired,
     LotExpiryMismatch,
 )
 from apps.inventory.models import (
@@ -323,24 +325,58 @@ def fractionate(
     *,
     source_lot_id: int,
     quantity: int,
-    batch_number: str,
-    expiry_date: date,
     user=None,
     reason: str = "Fraccionamiento de presentacion",
 ) -> tuple[StockMovement, StockMovement]:
-    """Abre presentaciones mayores y las convierte en presentaciones menores.
+    """Abre una presentacion mayor y la convierte en la menor configurada.
 
-    Ejemplo: 1 caja -> 10 blisteres. Genera **dos** movimientos en la misma
-    transaccion: la salida del origen y la entrada del destino, con el costo
-    unitario prorrateado por el factor.
+    Reglas de fraccionamiento (RF), fijadas con la farmacia:
+
+    RF1. Solo se fracciona un lote **vendible**: ni bloqueado ni vencido.
+         Abrir un lote vencido y vender sus unidades "blanquearia" el
+         vencimiento, que es justo lo que el sistema debe impedir.
+    RF2. La conversion va siempre de la presentacion mayor a la menor que
+         declare ``UnitConversion`` (factor >= 2), dentro del mismo grupo de
+         producto, y la presentacion destino debe estar activa.
+    RF3. La cantidad es un entero mayor que cero y no puede superar el stock
+         actual del lote de origen.
+    RF4. El lote destino **hereda** el numero de lote y el vencimiento del
+         origen: es el mismo producto fisico. No se piden al usuario ni se
+         pueden inventar; sin esto no hay trazabilidad.
+    RF5. Si el lote destino ya existe (misma presentacion, mismo lote), se le
+         suma la cantidad; nunca se crea un duplicado.
+    RF6. El costo unitario del destino es el del origen dividido por el factor.
+         El costo del origen no cambia.
+    RF7. Genera dos movimientos en la misma transaccion (salida y entrada) y un
+         evento de auditoria. Es **un solo paso**: caja -> blister y
+         blister -> unidad son dos operaciones distintas, cada una auditada.
+
+    Ejemplo: 1 caja de 10 blisters -> sale 1 caja, entran 10 blisters, con el
+    mismo lote y el mismo vencimiento.
     """
     if quantity <= 0:
         raise ValidationError("La cantidad a fraccionar debe ser mayor que cero.")
 
-    source_lot = Lot.objects.select_for_update().get(pk=source_lot_id)
+    source_lot = (
+        Lot.objects.select_for_update().select_related("product__group").get(pk=source_lot_id)
+    )
+
+    # RF1
+    if source_lot.is_blocked:
+        raise LotBlocked(
+            f"El lote {source_lot.batch_number} esta bloqueado y no se puede fraccionar.",
+            details={"lot_id": source_lot.pk, "reason": source_lot.block_reason},
+        )
+    if is_expired(source_lot):
+        raise LotExpired(
+            f"El lote {source_lot.batch_number} esta vencido y no se puede fraccionar.",
+            details={"lot_id": source_lot.pk, "expiry_date": source_lot.expiry_date.isoformat()},
+        )
+
+    # RF2
     conversion = (
         UnitConversion.objects.select_related("target")
-        .filter(source=source_lot.product)
+        .filter(source=source_lot.product, group_id=source_lot.product.group_id)
         .order_by("id")
         .first()
     )
@@ -351,13 +387,38 @@ def fractionate(
         )
 
     target_product = conversion.target
+    if target_product.group_id != source_lot.product.group_id:
+        raise InvalidConversion(
+            "La conversion cruza grupos de producto: revisa el catalogo.",
+            details={"conversion_id": conversion.pk},
+        )
+    if not target_product.is_active:
+        raise InvalidConversion(
+            f"La presentacion destino ({target_product}) esta inactiva.",
+            details={"product_id": target_product.pk},
+        )
+
+    # RF3
+    if quantity > source_lot.current_quantity:
+        raise InsufficientStock(
+            f"El lote {source_lot.batch_number} solo tiene "
+            f"{source_lot.current_quantity} unidades del origen.",
+            details={
+                "lot_id": source_lot.pk,
+                "batch_number": source_lot.batch_number,
+                "available": source_lot.current_quantity,
+                "requested": quantity,
+            },
+        )
+
     units = quantity * conversion.factor
     target_cost = round_unit_cost(source_lot.cost_price / conversion.factor)
 
+    # RF4 y RF5
     target_lot, _ = _get_or_create_lot(
         product=target_product,
-        batch_number=batch_number,
-        expiry_date=expiry_date,
+        batch_number=source_lot.batch_number,
+        expiry_date=source_lot.expiry_date,
         cost_price=target_cost,
     )
 

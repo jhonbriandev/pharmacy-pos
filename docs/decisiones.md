@@ -78,11 +78,11 @@ movimientos. El POS no tiene que lidiar con decimales de cantidad.
 
 **Contexto.** Redondear con `float` produce centavos fantasma en boletas.
 
-**Decision.** `Decimal` en toda la cadena; precios de venta con IGV incluido
-(18% por defecto, configurable por producto).
+**Decision.** `Decimal` en toda la cadena; precios de venta con IGV incluido.
 
 **Consecuencia.** El frontend usa centavos enteros solo para mostrar el carrito;
-el total definitivo lo calcula el backend.
+el total definitivo lo calcula el backend. La tasa es el 18% y no se configura
+por producto (ver D20).
 
 ---
 
@@ -217,16 +217,23 @@ produccion (`prod.py` no lo importa).
 
 ---
 
-## D17. TypeScript 5.9 y sesion fuera de TanStack Query
+## D17. Frontend en JavaScript y sin TypeScript
 
-**Contexto.** `typescript-eslint` 8.x aun no soporta TypeScript 7.x; la sesion es
-identidad, no un recurso que se revalide.
+**Contexto.** El proyecto arranco con TypeScript, pero el equipo que mantiene la
+farmacia no lo domina y la mayor parte del tiempo se perdia anotando tipos que la
+API ya garantiza en tiempo de ejecucion. El contrato real (formas de las
+respuestas, campos requeridos, codigos de error) vive en el backend y se prueba
+con pytest.
 
-**Decision.** Fijar TypeScript `~5.9.3`. La sesion vive en `AuthProvider`
-(contexto de React); TanStack Query se usa para datos de servidor.
+**Decision.** Todo el frontend es JavaScript con JSX (`.js` / `.jsx`). No hay
+`tsconfig.json`, ni `typescript`, ni `typescript-eslint`, ni paquetes `@types/*`.
+El alias `@/*` se resuelve con `jsconfig.json` para el editor y con el alias de
+Vite para el build. El estilo lo fija Prettier (`npm run format`).
 
-**Consecuencia.** Sin saltos de version que rompan el lint. La sesion se
-actualiza con `refresh()` tras login, cambio de clave o restablecimiento.
+**Consecuencia.** Menos herramientas y un build mas corto (`vite build`, sin
+`tsc -b`). La sesion sigue viviendo en `AuthProvider` (contexto de React) y
+TanStack Query se encarga de los datos de servidor. A cambio, un error de forma
+en el frontend se detecta en las pruebas con MSW o en ejecucion, no al compilar.
 
 ---
 
@@ -240,3 +247,48 @@ primera cuenta se crea en el servidor con `python manage.py create_admin`.
 
 **Consecuencia.** No hay endpoint de registro. El `seed` con datos ficticios
 solo corre con `DEBUG=True` (o con `--force` en un entorno de demostracion).
+
+---
+
+## D19. Reglas de fraccionamiento (RF1-RF7)
+
+**Contexto.** El fraccionamiento (abrir una caja para vender blisters o
+unidades sueltas) se presta a errores que rompen la trazabilidad por lote: abrir
+un lote vencido, inventar un vencimiento nuevo para la presentacion menor o
+duplicar lotes. La farmacia delego en el sistema la definicion de estas reglas.
+
+**Decision.** Se fijan siete reglas y se implementan en
+`apps/inventory/services.py::fractionate`, la unica puerta de entrada al stock:
+
+| Regla | Enunciado |
+|---|---|
+| RF1 | Solo se fracciona un lote **vendible**: ni bloqueado ni vencido |
+| RF2 | La conversion va de la presentacion mayor a la menor de `UnitConversion` (factor >= 2), dentro del mismo grupo, y la presentacion destino debe estar activa |
+| RF3 | La cantidad es un entero mayor que cero y no supera el stock del lote de origen |
+| RF4 | El lote destino **hereda** el numero de lote y el vencimiento del origen: no se piden al usuario |
+| RF5 | Si el lote destino ya existe, se le suma la cantidad; no se crea un duplicado |
+| RF6 | El costo unitario del destino es el del origen dividido por el factor |
+| RF7 | Son **dos** movimientos en una transaccion (salida y entrada) y un evento de auditoria; un paso por operacion |
+
+**Consecuencia.** El endpoint `/stock-fractionations/` solo recibe
+`source_lot`, `quantity` y un `reason` opcional: el lote y el vencimiento no se
+pueden falsear porque el servidor los copia del origen. Caja -> blister y
+blister -> unidad son dos operaciones distintas, cada una auditada.
+
+---
+
+## D20. IGV fijo en 18%, incluido en el precio
+
+**Contexto.** El precio de venta en la farmacia ya incluye el IGV y la boleta no
+discrimina el impuesto. Tener una tasa editable por producto abria la puerta a
+inconsistencias sin aportar nada al MVP.
+
+**Decision.** El IGV es el **18%**, un valor unico del sistema. `Product.tax_rate`
+se conserva como dato informativo (por si mas adelante se necesita exceptuar un
+producto), pero la API lo expone como **solo lectura**: ni el alta ni la
+edicion de un producto pueden cambiarlo. El formulario del catalogo ya no lo
+pide.
+
+**Consecuencia.** Todo producto queda en 18% hasta que exista un cambio
+explicito (una migracion y una decision nuevas), no por descuido de quien captura
+datos. Hay pruebas que lo verifican en `tests/test_api_catalog.py`.

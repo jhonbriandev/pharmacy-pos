@@ -8,7 +8,7 @@ precio, un lote, un descuento de stock ni un permiso.
 
 ```
 +---------------------------+        HTTPS         +---------------------------+
-|  React 19 + Vite + TS     |  fetch + cookies   |  Django 5.2 + DRF         |
+|  React 19 + Vite + JSX   |  fetch + cookies   |  Django 5.2 + DRF         |
 |  Tailwind 4               | <----------------> |  sesion + CSRF            |
 |  TanStack Query           |                    |                           |
 +---------------------------+                    +-------------+-------------+
@@ -128,11 +128,12 @@ intento logico y lo reutiliza al reintentar.
 
 ## Dinero y cantidades
 
-- Dinero en `Decimal`, jamas `float`. Precios con IGV incluido (18% por
-  defecto, configurable por producto).
+- Dinero en `Decimal`, jamas `float`. El IGV es el 18% y va incluido en el
+  precio de venta; la API no permite cambiar la tasa por producto.
 - Cantidades enteras: no hay ventas de media caja. El fraccionamiento convierte
   una presentacion en otra y genera dos movimientos (salida de la caja, entrada
-  de las unidades).
+  de las unidades). El lote destino hereda el numero de lote y el vencimiento
+  del origen (RF1-RF7, ver `docs/decisiones.md` D19).
 - El frontend puede sumar el carrito en centavos **solo para mostrar**; el total
   que vale es el que devuelve el servidor.
 
@@ -141,7 +142,7 @@ intento logico y lo reutiliza al reintentar.
 ```
 src/
   app/          router, providers, layout, guards, navegacion
-  api/          cliente HTTP (CSRF, errores) y endpoints tipados
+  api/          cliente HTTP (CSRF, errores) y endpoints
   features/     auth | pos | sales | inventory | catalog | dashboard | users | audit
   components/   UI reutilizable (Button, Field, Table, Modal, ...)
   lib/          formato de dinero/fechas, carrito, hooks, ids
@@ -150,6 +151,8 @@ src/
 
 - La sesion vive en un contexto de React (`AuthProvider`), no en la cache de
   TanStack Query: es estado de identidad, no datos de servidor.
+- JavaScript con JSX (sin TypeScript). El contrato con la API se documenta en
+  `docs/api.md` y se cubre con pruebas; Prettier fija el formato.
 - TanStack Query maneja listados, dashboard y mutaciones; no hay Redux.
 - El menu y las rutas se filtran por `capabilities` que devuelve `/auth/me/`.
   Es comodidad, no seguridad: el backend vuelve a verificar cada peticion.

@@ -204,19 +204,21 @@ Ajuste de stock. `movement_type` es `AJUSTE_POSITIVO`, `AJUSTE_NEGATIVO`,
 }
 ```
 
-Fraccionamiento: se abre un lote de la presentacion mayor y se crea el lote de
-la presentacion menor que tenga configurada la conversion. La fecha de
-vencimiento se conserva del lote de origen.
+Fraccionamiento: se abre un lote de la presentacion mayor y entra el lote de la
+presentacion menor que tenga configurada la conversion. El servidor copia el
+numero de lote y la fecha de vencimiento del origen (no se envian), y rechaza el
+lote de origen si esta vencido o bloqueado (RF1-RF7, ver `docs/decisiones.md`).
 
 ```json
 {
   "source_lot": 7,
   "quantity": 2,
-  "batch_number": "L-2601",
-  "expiry_date": "2027-01-27",
   "reason": "Venta al detalle"
 }
 ```
+
+Errores posibles: `lot_expired`, `lot_blocked`, `insufficient_stock`,
+`invalid_conversion`, `lot_expiry_mismatch`.
 
 Bloqueo de lote:
 

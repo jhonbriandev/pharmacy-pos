@@ -102,7 +102,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "is_active",
             "stock",
         )
-        read_only_fields = ("last_cost",)
+        read_only_fields = ("last_cost", "tax_rate")
 
     def get_group_name(self, obj: Product) -> str:
         return obj.group.name

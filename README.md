@@ -24,10 +24,10 @@ inventario, autenticacion por roles y dashboard para gerencia.
 | 8. Despliegue | configurado (Render + Vercel) |
 | 9. Documentacion final | listo |
 
-Pendiente de confirmar con la farmacia y su contador: las reglas exactas de
-fraccionamiento por quimica farmaceutica y el tratamiento del IGV por producto.
-Hasta entonces rige el valor por defecto (18%) y la conversion cargada en el
-catalogo.
+Pendiente de confirmar con la farmacia y su contador el tratamiento tributario
+de las boletas. Hasta entonces rige el IGV del 18%, incluido en el precio de
+venta. Las reglas de fraccionamiento (RF1-RF7) ya estan fijadas y documentadas
+en `docs/decisiones.md` (D19).
 
 ---
 
@@ -37,11 +37,12 @@ catalogo.
 |---|---|
 | Backend | Python 3.13 + Django 5.2 LTS + Django REST Framework |
 | Base de datos | PostgreSQL 18 |
-| Frontend | React 19 + Vite + TypeScript |
+| Frontend | React 19 + Vite + JavaScript (JSX) |
 | Estilos | Tailwind CSS 4 |
 | Estado de servidor | TanStack Query |
 | Pruebas backend | pytest + pytest-django + factory-boy |
 | Pruebas frontend | Vitest + Testing Library + MSW |
+| Formato frontend | Prettier |
 | Servidor de aplicacion | Gunicorn (solo en Linux/produccion) |
 | Despliegue | backend en Render, frontend en Vercel |
 
@@ -159,8 +160,8 @@ Abre <http://localhost:5173>.
 | `npm run dev` | servidor de desarrollo con proxy a la API |
 | `npm run build` | compilacion de produccion |
 | `npm run test` | pruebas unitarias |
-| `npm run typecheck` | verificacion de tipos |
 | `npm run lint` | analisis estatico |
+| `npm run format` | formatear con Prettier |
 
 ---
 
@@ -174,7 +175,7 @@ cd ..\\frontend
 npm run test
 ```
 
-- Backend: 238 pruebas que cubren servicios, API, transacciones, concurrencia
+- Backend: 248 pruebas que cubren servicios, API, transacciones, concurrencia
   (dos cajeros sobre el mismo lote), la matriz de 5 roles por endpoint y un
   recorrido que exige que cada ruta quede cubierta por un permiso explicito.
 - Frontend: pruebas de login, POS (precio del servidor, reintento idempotente,

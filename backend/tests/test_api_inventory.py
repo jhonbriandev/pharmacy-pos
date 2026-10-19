@@ -175,8 +175,6 @@ def test_fractionation_endpoint_splits_a_box(product, warehouse_user):
         {
             "source_lot": box_lot.pk,
             "quantity": 1,
-            "batch_number": "BLI-FRAC",
-            "expiry_date": box_lot.expiry_date.isoformat(),
         },
         format="json",
     )
@@ -184,7 +182,9 @@ def test_fractionation_endpoint_splits_a_box(product, warehouse_user):
     assert response.status_code == 201
     box_lot.refresh_from_db()
     assert box_lot.current_quantity == 3
-    assert Lot.objects.get(batch_number="BLI-FRAC").current_quantity == 10
+    # RF4: el lote destino conserva el numero de lote del origen.
+    blister_lot = Lot.objects.get(product=blister, batch_number="CAJA-FRAC")
+    assert blister_lot.current_quantity == 10
 
 
 def test_consistency_endpoint_reports_ok(stocked_lot, admin_user):

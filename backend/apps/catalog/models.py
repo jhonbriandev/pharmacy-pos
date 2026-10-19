@@ -178,7 +178,7 @@ class Product(TimeStampedModel):
         max_digits=12,
         decimal_places=2,
         validators=[MinValueValidator(0)],
-        help_text="Precio final con IGV incluido.",
+        help_text="Precio final con IGV (18%) incluido.",
     )
     tax_rate = models.DecimalField(
         "tasa de IGV (%)",
@@ -186,7 +186,7 @@ class Product(TimeStampedModel):
         decimal_places=2,
         default=18,
         validators=[MinValueValidator(0)],
-        help_text="Solo informativo: el precio ya incluye el impuesto.",
+        help_text="Solo informativo: el precio ya incluye el IGV del 18%.",
     )
     last_cost = models.DecimalField(
         "ultimo costo unitario",

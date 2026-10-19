@@ -180,12 +180,14 @@ class StockAdjustmentSerializer(serializers.Serializer):
 
 
 class FractionationSerializer(serializers.Serializer):
-    """Fraccionamiento: abrir una caja y convertirla en blisteres o unidades."""
+    """Fraccionamiento: abrir una caja y convertirla en blisteres o unidades.
+
+    El lote destino hereda el numero de lote y el vencimiento del origen (RF4),
+    por eso no se piden aqui: no son datos que el operador pueda elegir.
+    """
 
     source_lot = serializers.PrimaryKeyRelatedField(queryset=Lot.objects.all())
     quantity = serializers.IntegerField(min_value=1)
-    batch_number = serializers.CharField(max_length=64)
-    expiry_date = serializers.DateField()
     reason = serializers.CharField(max_length=160, required=False, allow_blank=True)
 
 

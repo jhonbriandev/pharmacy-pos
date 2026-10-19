@@ -7,10 +7,17 @@ from uuid import uuid4
 import pytest
 from django.core.exceptions import ValidationError
 
-from apps.inventory.exceptions import InsufficientStock, LotExpiryMismatch
+from apps.inventory.exceptions import (
+    InsufficientStock,
+    InvalidConversion,
+    LotBlocked,
+    LotExpired,
+    LotExpiryMismatch,
+)
 from apps.inventory.models import Lot, MovementType, StockMovement
 from apps.inventory.services import (
     adjust_stock,
+    block_lot,
     create_stock_entry,
     fractionate,
     is_expired,
@@ -420,39 +427,121 @@ def test_adjustment_records_movement_and_user(stocked_lot, admin_user):
     assert movement.balance_after == 8
 
 
-def test_fractionation_moves_stock_between_presentations(product, warehouse_user):
+# ---------------------------------------------------------------------------
+# Fraccionamiento (reglas RF1-RF7 en apps/inventory/services.py)
+# ---------------------------------------------------------------------------
+
+
+def add_blister(product, *, factor=10, is_active=True, barcode="7000000000002"):
+    """Presentacion menor del grupo con su conversion caja -> blister."""
     from apps.catalog.models import PresentationType, Product, UnitConversion
 
     blister = Product.objects.create(
         group=product.group,
         presentation=PresentationType.BLISTER,
-        presentation_detail="x 10",
-        barcode="7000000000002",
+        presentation_detail=f"x {factor}",
+        barcode=barcode,
         sale_price=Decimal("1.80"),
+        is_active=is_active,
     )
-    UnitConversion.objects.create(group=product.group, source=product, target=blister, factor=10)
+    UnitConversion.objects.create(
+        group=product.group, source=product, target=blister, factor=factor
+    )
+    return blister
 
-    box_lot = Lot.objects.create(
-        product=product,
-        batch_number="CAJA-01",
-        expiry_date=today() + timedelta(days=200),
-        current_quantity=5,
-        cost_price=Decimal("8.00"),
-    )
+
+def test_fractionation_moves_stock_between_presentations(product, lot_factory, warehouse_user):
+    blister = add_blister(product, factor=10)
+    box_lot = lot_factory(days_to_expiry=200, quantity=5, cost="8.0000", batch="CAJA-01")
 
     out_movement, in_movement = fractionate(
         source_lot_id=box_lot.pk,
         quantity=2,
-        batch_number="BLI-01",
-        expiry_date=today() + timedelta(days=200),
         user=warehouse_user,
     )
 
     box_lot.refresh_from_db()
-    blister_lot = Lot.objects.get(batch_number="BLI-01")
+    blister_lot = Lot.objects.get(product=blister, batch_number="CAJA-01")
     assert box_lot.current_quantity == 3
     assert blister_lot.current_quantity == 20
+    # RF4: el destino hereda el lote y el vencimiento del origen.
+    assert blister_lot.batch_number == box_lot.batch_number
+    assert blister_lot.expiry_date == box_lot.expiry_date
     assert out_movement.quantity_delta == -2
     assert in_movement.quantity_delta == 20
-    # El costo se prorratea por el factor de conversion.
+    assert out_movement.movement_type == MovementType.FRACTIONATION_OUT
+    assert in_movement.movement_type == MovementType.FRACTIONATION_IN
+    # RF6: el costo del destino es el del origen dividido por el factor.
     assert blister_lot.cost_price == Decimal("0.8000")
+
+
+def test_fractionation_reuses_the_target_lot(product, lot_factory, warehouse_user):
+    blister = add_blister(product, factor=10)
+    box_lot = lot_factory(days_to_expiry=200, quantity=5, cost="8.0000", batch="CAJA-01")
+
+    fractionate(source_lot_id=box_lot.pk, quantity=1, user=warehouse_user)
+    fractionate(source_lot_id=box_lot.pk, quantity=1, user=warehouse_user)
+
+    # RF5: se suma al mismo lote destino; no se crea un duplicado.
+    assert Lot.objects.filter(product=blister).count() == 1
+    assert Lot.objects.get(product=blister).current_quantity == 20
+
+
+def test_fractionation_rejects_an_expired_source(product, lot_factory, warehouse_user):
+    add_blister(product, factor=10)
+    expired = lot_factory(days_to_expiry=-1, quantity=5, batch="VENCIDO")
+
+    with pytest.raises(LotExpired):
+        fractionate(source_lot_id=expired.pk, quantity=1, user=warehouse_user)
+
+
+def test_fractionation_rejects_a_blocked_source(product, lot_factory, warehouse_user):
+    add_blister(product, factor=10)
+    lot = lot_factory(days_to_expiry=200, quantity=5, batch="BLOQUEADO")
+    block_lot(lot_id=lot.pk, reason="Cuarentena", user=warehouse_user)
+
+    with pytest.raises(LotBlocked):
+        fractionate(source_lot_id=lot.pk, quantity=1, user=warehouse_user)
+
+
+def test_fractionation_rejects_more_than_available(product, lot_factory, warehouse_user):
+    add_blister(product, factor=10)
+    lot = lot_factory(days_to_expiry=200, quantity=5, batch="CAJA-01")
+
+    with pytest.raises(InsufficientStock):
+        fractionate(source_lot_id=lot.pk, quantity=6, user=warehouse_user)
+
+
+def test_fractionation_requires_a_conversion(product, lot_factory, warehouse_user):
+    lot = lot_factory(days_to_expiry=200, quantity=5, batch="CAJA-01")
+
+    with pytest.raises(InvalidConversion):
+        fractionate(source_lot_id=lot.pk, quantity=1, user=warehouse_user)
+
+
+def test_fractionation_rejects_an_inactive_target(product, lot_factory, warehouse_user):
+    add_blister(product, factor=10, is_active=False)
+    lot = lot_factory(days_to_expiry=200, quantity=5, batch="CAJA-01")
+
+    with pytest.raises(InvalidConversion):
+        fractionate(source_lot_id=lot.pk, quantity=1, user=warehouse_user)
+
+
+def test_fractionation_rejects_a_non_positive_quantity(product, lot_factory, warehouse_user):
+    add_blister(product, factor=10)
+    lot = lot_factory(days_to_expiry=200, quantity=5, batch="CAJA-01")
+
+    with pytest.raises(ValidationError):
+        fractionate(source_lot_id=lot.pk, quantity=0, user=warehouse_user)
+
+
+def test_fractionation_records_an_audit_event(product, lot_factory, warehouse_user):
+    from apps.audit.models import AuditAction, AuditEvent
+
+    add_blister(product, factor=10)
+    lot = lot_factory(days_to_expiry=200, quantity=5, batch="CAJA-01")
+
+    fractionate(source_lot_id=lot.pk, quantity=1, user=warehouse_user)
+
+    event = AuditEvent.objects.get(action=AuditAction.FRACTIONATION)
+    assert event.actor == warehouse_user

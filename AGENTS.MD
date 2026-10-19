@@ -15,11 +15,12 @@ por lote y vencimiento, autenticacion por roles y dashboard para gerencia.
 |---|---|---|
 | Backend | Django 5.2 LTS + DRF 3.18 | Se elige 5.2 LTS y **no** 6.x por compatibilidad declarada de las dependencias |
 | Base de datos | PostgreSQL 18 | Nunca SQLite: invalidaria las pruebas de concurrencia |
-| Frontend | React 19 + Vite 8 + TypeScript | |
+| Frontend | React 19 + Vite 8 + JavaScript (JSX) | Sin TypeScript: el contrato con la API se documenta y se prueba, no se tipa |
 | Estilos | Tailwind CSS 4 | |
 | Estado de servidor | TanStack Query | Sin Redux |
 | Pruebas backend | pytest + pytest-django + factory-boy | |
 | Pruebas frontend | Vitest + Testing Library + MSW | |
+| Formato frontend | Prettier | `npm run format` |
 
 ## Estructura
 
@@ -39,7 +40,7 @@ backend/
 frontend/
   src/
     app/             router, providers, layout
-    api/             cliente HTTP tipado e interceptores
+    api/             cliente HTTP e interceptores
     features/        auth | pos | inventory | catalog | dashboard | users
     components/      UI reutilizable
     lib/             formato de moneda (S/) y fechas (dd/mm/yyyy)
@@ -57,8 +58,13 @@ scripts/             utilidades de entorno
 3. **La venta es una sola transaccion.** Venta, lineas, asignacion de lotes,
    movimientos y descuento de stock se confirman juntas o no se confirman.
 4. **Cantidades enteras.** Cajas, blisteres y unidades son SKUs distintos
-   dentro de un `ProductGroup`. El fraccionamiento genera dos movimientos.
-5. **Dinero con `Decimal`**, nunca `float`. Precios con IGV incluido.
+   dentro de un `ProductGroup`. El fraccionamiento (RF1-RF7, ver
+   `apps/inventory/services.py`) convierte una presentacion mayor en la menor
+   con dos movimientos en la misma transaccion, y el lote destino hereda el
+   numero de lote y el vencimiento del origen.
+5. **Dinero con `Decimal`**, nunca `float`. El IGV es el 18% y va incluido en
+   el precio de venta; `Product.tax_rate` es informativo y la API no permite
+   cambiarlo por producto.
 6. **Fechas y vencimientos** se evaluan en `America/Lima`. Un lote vence al
    final de su fecha: es vendible ese dia y se bloquea desde el dia siguiente.
 7. **Dependencias entre apps:** `common` y `accounts` no importan a nadie;
@@ -96,4 +102,5 @@ npm run dev
 npm run test
 npm run build
 npm run lint
+npm run format
 ```

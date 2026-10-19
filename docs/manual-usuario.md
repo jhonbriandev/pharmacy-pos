@@ -102,8 +102,15 @@ obligatorio.
 ### Fraccionar
 
 Abre una presentacion mayor (por ejemplo, una caja) y crea la menor (blisters o
-unidades). La fecha de vencimiento se conserva del lote de origen. Hay que
-elegir el lote de origen y cuantas unidades abrir.
+unidades). Solo hay que elegir el lote de origen y cuantas unidades abrir.
+
+- El sistema **conserva el numero de lote y el vencimiento** del origen: no se
+  inventan datos nuevos para la presentacion menor.
+- Si el lote de destino ya existe, se le suma la cantidad.
+- No se puede fraccionar un lote vencido ni uno bloqueado.
+- El costo de la presentacion menor se calcula solo, dividiendo el costo del
+  origen entre el factor de conversion.
+- Caja a blister y blister a unidad son dos fraccionamientos distintos.
 
 ### Vencimientos
 
@@ -126,8 +133,9 @@ productos.
   que usa el fraccionamiento.
 - El **stock minimo** alimenta el aviso de productos por agotarse.
 
-Cada presentacion tiene su precio de venta (con IGV incluido) y su porcentaje de
-IGV. Los cambios de precio quedan registrados en auditoria.
+Cada presentacion tiene su precio de venta, que ya incluye el **IGV del 18%**.
+El IGV es un dato fijo del sistema: no se elige por producto. Los cambios de
+precio quedan registrados en auditoria.
 
 ## Dashboard
 

@@ -112,8 +112,6 @@ class FractionationView(APIView):
         out_movement, in_movement = fractionate(
             source_lot_id=data["source_lot"].pk,
             quantity=data["quantity"],
-            batch_number=data["batch_number"],
-            expiry_date=data["expiry_date"],
             reason=data.get("reason") or "Fraccionamiento de presentacion",
             user=request.user,
         )

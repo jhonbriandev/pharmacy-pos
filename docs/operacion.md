@@ -71,7 +71,7 @@ pytest --reuse-db
 cd frontend
 npm run test
 npm run lint
-npm run typecheck
+npm run build
 ```
 
 La suite del backend corre con `config.settings.test` (hasher rapido, sin
