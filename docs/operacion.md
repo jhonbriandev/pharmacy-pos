@@ -153,8 +153,12 @@ es mejor decidir donde viven los datos de forma explicita.
    real del backend:
 
    ```json
-   { "source": "/api/:path*", "destination": "https://tu-servicio.onrender.com/api/:path*" }
+   { "source": "/api/(.*)", "destination": "https://tu-servicio.onrender.com/api/$1" }
    ```
+
+   Usa `(.*)` y `$1`, **no** `:path*`: el patron `:path*` no casa con las rutas
+   que terminan en barra (`/api/v1/auth/login/`), que son justamente las que
+   usa el cliente, y Vercel responde su propio 404.
 
 4. Despliega. El otro rewrite manda cualquier ruta al `index.html` para que el
    router del navegador funcione al recargar.
