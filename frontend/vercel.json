@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REEMPLAZA-CON-TU-SERVICIO.onrender.com/api/:path*"
+      "destination": "https://my-pos-api-2g1o.onrender.com/api/:path*"
     },
     {
       "source": "/((?!api/).*)",
