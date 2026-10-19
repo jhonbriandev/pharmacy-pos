@@ -85,6 +85,16 @@ scripts/             utilidades de entorno
   `TransactionTestCase`.
 - El backend se prueba **contra PostgreSQL**, no contra SQLite.
 
+## Ramas y releases
+
+- `main` es **produccion**: solo recibe merges de `develop` (o `release/*`) y se
+  etiqueta con `vX.Y.Z` cuando se despliega.
+- `develop` es la rama de integracion; la CI corre en cada push.
+- El trabajo diario va en `feat/<tema>` o `fix/<tema>`, sale de `develop` y
+  vuelve por pull request. No se hace push directo a `main`.
+- Un arreglo urgente sale de `main` como `hotfix/<tema>`, se mergea a `main` y
+  se vuelve a mergear a `develop` para no perderlo.
+
 ## Comandos
 
 Dentro de `backend/` con el entorno virtual activado:
