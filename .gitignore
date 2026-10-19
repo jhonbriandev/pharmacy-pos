@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------
+# Secretos y entorno  (nunca versionar)
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------
+# Python / Django
+# ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+*.log
+db.sqlite3
+db.sqlite3-journal
+/backend/media/
+/backend/staticfiles/
+
+# ---------------------------------------------------------------
+# Node / React / Vite
+# ---------------------------------------------------------------
+node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/coverage/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------
+# Editores y sistema operativo
+# ---------------------------------------------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ---------------------------------------------------------------
+# Respaldos locales de base de datos
+# ---------------------------------------------------------------
+*.dump
+*.sql.gz

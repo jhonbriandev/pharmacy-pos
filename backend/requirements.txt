@@ -1,0 +1,20 @@
+# ---------------------------------------------------------------------------
+#  my-pos :: dependencias de produccion
+#
+#  Se fijan por rama menor (~=) para recibir parches de seguridad sin saltos
+#  de version mayor. Ver docs/decisiones.md (D1).
+#
+#  Generado y verificado contra Python 3.13.14 / PostgreSQL 18.2.
+# ---------------------------------------------------------------------------
+
+Django~=5.2.0
+djangorestframework~=3.18.0
+psycopg[binary]~=3.3.0
+django-cors-headers~=4.9.0
+django-filter~=26.2
+django-environ~=0.14.0
+whitenoise~=6.12.0
+
+# Servidor de aplicacion: solo se ejecuta en Linux (Render). En Windows no
+# arranca, pero se instala igual para que el entorno sea identico al de prod.
+gunicorn~=26.2.0

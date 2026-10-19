@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+#  my-pos :: despliegue del backend en Render
+#
+#  Este archivo es un "Blueprint": Render lo lee desde la raiz del repositorio
+#  y crea el servicio web. No contiene secretos: los que no se pueden generar
+#  (DATABASE_URL, dominios del frontend) se piden en el panel.
+#
+#  Pasos: New > Blueprint > selecciona este repositorio. Render pedira los
+#  valores marcados con `sync: false`.
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: my-pos-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate --noinput
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.prod
+      - key: PYTHON_VERSION
+        value: "3.13.14"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: my-pos-api.onrender.com
+      - key: DJANGO_USE_X_FORWARDED_PROTO
+        value: "True"
+      - key: DJANGO_CONN_MAX_AGE
+        value: "60"
+      - key: DJANGO_LOG_LEVEL
+        value: INFO
+      # Cadena de conexion a PostgreSQL. Puede venir de Render o de Neon;
+      # por eso no se aprovisiona una base aqui (las gratuitas caducan).
+      - key: DATABASE_URL
+        sync: false
+      # Dominio del frontend en Vercel, por ejemplo:
+      #   https://my-pos.vercel.app
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: DJANGO_CORS_ALLOWED_ORIGINS
+        sync: false

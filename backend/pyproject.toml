@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------------------
+#  my-pos :: configuracion de herramientas (ruff, pytest, coverage)
+#
+#  Las dependencias viven en requirements.txt / requirements-dev.txt para que
+#  el despliegue en Render sea directo. Este archivo solo contiene configuracion.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["*/migrations/*", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "DJ",   # flake8-django
+    "C4",   # comprehensions
+    "SIM",  # simplificaciones
+]
+ignore = [
+    "E501",  # el largo de linea lo controla el formateador
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/migrations/*" = ["E501", "DJ008"]
+"*/tests/*" = ["SIM117"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+# Settings de prueba: hashers rapidos y sin throttling. La base de datos
+# sigue siendo PostgreSQL (ver config/settings/test.py).
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["."]
+python_files = ["test_*.py", "*_tests.py"]
+testpaths = ["apps", "tests"]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "concurrency: pruebas que verifican condiciones de carrera (requieren PostgreSQL real)",
+    "slow: pruebas lentas que pueden excluirse en desarrollo",
+]
+
+[tool.coverage.run]
+source = ["apps"]
+branch = true
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/apps.py",
+    "*/admin.py",
+    "manage.py",
+    "config/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
