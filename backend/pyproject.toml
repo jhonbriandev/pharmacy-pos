@@ -34,19 +34,6 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 
-[tool.pytest.ini_options]
-# Settings de prueba: hashers rapidos y sin throttling. La base de datos
-# sigue siendo PostgreSQL (ver config/settings/test.py).
-DJANGO_SETTINGS_MODULE = "config.settings.test"
-pythonpath = ["."]
-python_files = ["test_*.py", "*_tests.py"]
-testpaths = ["apps", "tests"]
-addopts = "-ra --strict-markers --strict-config"
-markers = [
-    "concurrency: pruebas que verifican condiciones de carrera (requieren PostgreSQL real)",
-    "slow: pruebas lentas que pueden excluirse en desarrollo",
-]
-
 [tool.coverage.run]
 source = ["apps"]
 branch = true

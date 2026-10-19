@@ -40,7 +40,7 @@ en `docs/decisiones.md` (D19).
 | Frontend | React 19 + Vite + JavaScript (JSX) |
 | Estilos | Tailwind CSS 4 |
 | Estado de servidor | TanStack Query |
-| Pruebas backend | pytest + pytest-django + factory-boy |
+| Pruebas backend | Django `TestCase` / `APITestCase` + factory-boy |
 | Pruebas frontend | Vitest + Testing Library + MSW |
 | Formato frontend | Prettier |
 | Servidor de aplicacion | Gunicorn (solo en Linux/produccion) |
@@ -148,8 +148,8 @@ Abre <http://localhost:5173>.
 | `python manage.py seed` | cargar datos ficticios de demostracion |
 | `python manage.py create_admin --dni 12345678` | crear la cuenta administradora de arranque |
 | `python manage.py check_consistency` | comparar el stock con el libro de movimientos |
-| `pytest` | ejecutar las pruebas |
-| `pytest --cov` | pruebas con cobertura |
+| `python manage.py test` | ejecutar las pruebas |
+| `coverage run manage.py test && coverage report` | pruebas con cobertura |
 | `ruff check .` | analisis estatico |
 | `ruff format .` | formateo |
 
@@ -169,15 +169,16 @@ Abre <http://localhost:5173>.
 
 ```powershell
 cd backend
-.\\.venv\\Scripts\\python.exe -m pytest --reuse-db
+.\\.venv\\Scripts\\python.exe manage.py test --keepdb
 
 cd ..\\frontend
 npm run test
 ```
 
-- Backend: 248 pruebas que cubren servicios, API, transacciones, concurrencia
-  (dos cajeros sobre el mismo lote), la matriz de 5 roles por endpoint y un
-  recorrido que exige que cada ruta quede cubierta por un permiso explicito.
+- Backend: 111 pruebas que cubren servicios, API, transacciones y concurrencia
+  (dos cajeros sobre el mismo lote). La matriz de 5 roles por endpoint y el
+  recorrido de rutas se ejecutan con `subTest`, de modo que un fallo identifica
+  el rol y la ruta exactos.
 - Frontend: pruebas de login, POS (precio del servidor, reintento idempotente,
   falta de stock) y formato de dinero y fechas.
 - El backend se prueba **contra PostgreSQL**, nunca SQLite: la correccion de las

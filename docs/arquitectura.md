@@ -159,13 +159,37 @@ src/
 - Dinero con `Intl.NumberFormat("es-PE", "PEN")`; fechas en `dd/mm/yyyy` con
   `America/Lima`.
 
+### Por que existe `src/api/`
+
+No es una capa obligatoria de React, pero evita que cada componente invente su
+propio `fetch`:
+
+- **Un solo origen.** `baseUrl`, `credentials: "include"` y el token CSRF viven
+  en un unico cliente; cambiar el proxy de Vercel o el backend de Render no toca
+  las pantallas.
+- **Un solo manejo de errores.** El backend responde
+  `{error: {code, message, details}}`; `api/client.js` lo convierte en un error
+  uniforme y las features solo muestran el mensaje o reaccionan al `code`
+  (`insufficient_stock`, `lot_expired`, ...).
+- **Contrato por caso de uso.** `salesApi.create`, `inventoryApi.entry`, etc.
+  agrupan URL, payload y respuesta. El componente no conoce rutas ni formatos.
+- **Pruebas con MSW.** Los tests interceptan esas mismas funciones; si cambia
+  la forma de la respuesta, falla una prueba y no cinco pantallas.
+- **Frontera de seguridad.** La sesion es una cookie `HttpOnly`: el frontend no
+  puede leerla ni guardar tokens. Todo pasa por el cliente que la envia.
+
+En resumen: no es estrictamente necesario para que React funcione, pero es la
+diferencia entre un solo lugar que cambia y veinte componentes repitiendo la
+misma logica.
+
 ## Pruebas
 
 | Nivel | Herramienta | Que cubre |
 |---|---|---|
-| Backend unitario e integracion | pytest + pytest-django + factory-boy | servicios, API, transacciones |
-| Concurrencia | pytest + transacciones reales | dos cajeros vendiendo el mismo lote |
-| Matriz de permisos | pytest | 5 roles x cada endpoint + recorrido de rutas |
+| Backend unitario e integracion | Django `TestCase` + factory-boy | servicios, modelos y transacciones |
+| API | Django `APITestCase` + factory-boy | permisos, validaciones y contrato HTTP |
+| Concurrencia | `TransactionTestCase` + PostgreSQL real | dos cajeros vendiendo el mismo lote |
+| Matriz de permisos | `APITestCase` + `subTest` | 5 roles x cada endpoint + recorrido de rutas |
 | Frontend | Vitest + Testing Library + MSW | login, POS, carrito, formato |
 
 Las pruebas del backend corren **contra PostgreSQL**, nunca SQLite: SQLite no

@@ -223,7 +223,7 @@ produccion (`prod.py` no lo importa).
 farmacia no lo domina y la mayor parte del tiempo se perdia anotando tipos que la
 API ya garantiza en tiempo de ejecucion. El contrato real (formas de las
 respuestas, campos requeridos, codigos de error) vive en el backend y se prueba
-con pytest.
+con la suite de Django (`TestCase` / `APITestCase`).
 
 **Decision.** Todo el frontend es JavaScript con JSX (`.js` / `.jsx`). No hay
 `tsconfig.json`, ni `typescript`, ni `typescript-eslint`, ni paquetes `@types/*`.

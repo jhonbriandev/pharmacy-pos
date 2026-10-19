@@ -18,7 +18,7 @@ por lote y vencimiento, autenticacion por roles y dashboard para gerencia.
 | Frontend | React 19 + Vite 8 + JavaScript (JSX) | Sin TypeScript: el contrato con la API se documenta y se prueba, no se tipa |
 | Estilos | Tailwind CSS 4 | |
 | Estado de servidor | TanStack Query | Sin Redux |
-| Pruebas backend | pytest + pytest-django + factory-boy | |
+| Pruebas backend | `TestCase` / `APITestCase` de Django + factory-boy | |
 | Pruebas frontend | Vitest + Testing Library + MSW | |
 | Formato frontend | Prettier | `npm run format` |
 
@@ -80,6 +80,9 @@ scripts/             utilidades de entorno
 - No borrar migraciones, datos ni usuarios. Se desactiva (`is_active=False`),
   no se elimina.
 - Toda funcionalidad nueva requiere pruebas de su comportamiento.
+- Las pruebas del backend se escriben con `TestCase` (servicios y modelos) o
+  `APITestCase` (API), con factories de `factory_boy`. La concurrencia usa
+  `TransactionTestCase`.
 - El backend se prueba **contra PostgreSQL**, no contra SQLite.
 
 ## Comandos
@@ -91,7 +94,7 @@ python manage.py runserver
 python manage.py migrate
 python manage.py makemigrations
 python manage.py seed
-pytest
+python manage.py test
 ruff check .
 ```
 

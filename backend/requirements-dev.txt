@@ -6,8 +6,6 @@
 
 -r requirements.txt
 
-pytest~=8.4
-pytest-django~=4.14.0
 factory-boy~=3.3.0
 coverage~=7.16.0
 ruff~=0.17.0
