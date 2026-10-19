@@ -292,3 +292,30 @@ pide.
 **Consecuencia.** Todo producto queda en 18% hasta que exista un cambio
 explicito (una migracion y una decision nuevas), no por descuido de quien captura
 datos. Hay pruebas que lo verifican en `tests/test_api_catalog.py`.
+
+---
+
+## D21. Pruebas con TestCase/APITestCase y factories
+
+**Contexto.** La suite mezclaba `pytest` con `pytest-django` y fixtures de
+`conftest.py`. Era una herramienta mas que aprender y las fixtures ocultaban que
+datos creaba cada prueba.
+
+**Decision.** Se usa el runner nativo de Django (`python manage.py test`):
+
+- servicios y modelos: `django.test.TestCase` con `setUpTestData`;
+- API: `rest_framework.test.APITestCase`, con un cliente por rol;
+- concurrencia: `TransactionTestCase` (una transaccion por prueba ocultaria la
+  carrera);
+- datos: factories de `factory_boy` (`UserFactory`, `ProductFactory`,
+  `LotFactory`, `UnitConversionFactory`). `LotFactory` carga el stock con
+  `apply_movement`, nunca escribiendo `current_quantity`;
+- la matriz de permisos usa `subTest` para identificar rol y ruta.
+
+`manage.py` selecciona `config.settings.test` cuando el comando es `test`.
+
+**Consecuencia.** Se eliminan `pytest`, `pytest-django` y `conftest.py`; la
+suite queda en 111 metodos (~20 s) y la CI usa el mismo comando que un
+desarrollador. `--keepdb` conserva la base de pruebas entre corridas. Las
+pruebas de API obligan a pasar por HTTP real en vez de llamar servicios
+directamente.
