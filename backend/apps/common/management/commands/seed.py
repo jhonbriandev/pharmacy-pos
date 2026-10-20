@@ -81,11 +81,22 @@ class Command(BaseCommand):
             self.stdout.write(f"    {dni}  {first} {last:<18} {Role(role).label}")
         self.stdout.write("")
 
+        if not settings.DEBUG:
+            self.stdout.write(
+                self.style.WARNING(
+                    "  Aviso: entorno con DEBUG=False. Las cuentas recien creadas usan "
+                    "una contrasena conocida; desactivalas antes de cargar datos reales "
+                    "(no se eliminan: `is_active=False`)."
+                )
+            )
+            self.stdout.write("")
+
     # ------------------------------------------------------------------
     def _create_users(self) -> dict[str, User]:
         created: dict[str, User] = {}
+        reused: list[str] = []
         for dni, first, last, role in USERS:
-            user, _ = User.objects.get_or_create(
+            user, was_created = User.objects.get_or_create(
                 username=dni,
                 defaults={
                     "first_name": first,
@@ -95,10 +106,14 @@ class Command(BaseCommand):
                     "is_superuser": role == Role.ADMIN,
                 },
             )
-            # Se fija siempre la contrasena de demo para que el seed sea
-            # reproducible (nunca se hace en produccion: ver docs/operacion.md).
-            user.set_password(PASSWORD)
-            user.save()
+            # La contrasena de demo solo se fija al crear la cuenta. Con
+            # `--force` en un entorno con cuentas reales, el seed nunca debe
+            # cambiar la contrasena ni el rol de un usuario existente.
+            if was_created:
+                user.set_password(PASSWORD)
+                user.save(update_fields=["password"])
+            else:
+                reused.append(dni)
 
             key = {
                 Role.ADMIN: "admin",
@@ -109,6 +124,10 @@ class Command(BaseCommand):
             }[role]
             created.setdefault(key, user)
 
+        if reused:
+            self.stdout.write(
+                self.style.WARNING("  aviso: ya existian y no se tocaron: " + ", ".join(reused))
+            )
         self.stdout.write(f"  usuarios: {User.objects.count()}")
         return created
 

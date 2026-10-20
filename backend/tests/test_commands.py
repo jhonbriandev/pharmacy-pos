@@ -67,3 +67,31 @@ class ManagementCommandTests(TestCase):
             self.assertRaisesRegex(CommandError, "solo debe ejecutarse en desarrollo"),
         ):
             call_command("seed", verbosity=0)
+
+    def test_seed_force_loads_demo_data_without_touching_existing_accounts(self):
+        from apps.catalog.models import Product
+        from apps.sales.models import Sale
+
+        # Cuenta real que ya existe: el seed no debe pisar su contrasena ni rol.
+        existing = User.objects.create_user(
+            username="10000001", password=STRONG_PASSWORD, role=Role.REGENTE
+        )
+
+        with self.settings(DEBUG=False):
+            call_command("seed", force=True, verbosity=0)
+
+        existing.refresh_from_db()
+        self.assertTrue(existing.check_password(STRONG_PASSWORD))
+        self.assertEqual(existing.role, Role.REGENTE)
+
+        products = Product.objects.count()
+        sales = Sale.objects.count()
+        self.assertGreater(products, 0)
+        self.assertGreater(sales, 0)
+
+        # Idempotente: la segunda corrida no duplica catalogo ni ventas.
+        with self.settings(DEBUG=False):
+            call_command("seed", force=True, verbosity=0)
+
+        self.assertEqual(Product.objects.count(), products)
+        self.assertEqual(Sale.objects.count(), sales)
