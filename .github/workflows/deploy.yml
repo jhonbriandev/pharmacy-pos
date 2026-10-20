@@ -52,7 +52,8 @@ jobs:
 
       - name: Aviso si no hay deploy hooks
         if: env.RENDER_HOOK == '' && env.VERCEL_HOOK == ''
-        run: echo "Sin deploy hooks: despliega la integracion nativa de Git (auto-deploy)."
+        run: |
+          echo "Sin deploy hooks: despliega la integracion nativa de Git (auto-deploy)."
 
       - name: Esperar a que la API responda
         run: |
