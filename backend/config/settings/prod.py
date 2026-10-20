@@ -8,7 +8,7 @@ Requiere que estas variables de entorno existan en el panel de Render:
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
-from .base import env
+from .base import REST_FRAMEWORK, env
 
 DEBUG = False
 
@@ -30,11 +30,24 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
-# Los estaticos de Django (admin y API navegable no aplica) se sirven con
+# Los estaticos de Django (admin y panel navegable de la API) se sirven con
 # manifiesto comprimido. El frontend NO se sirve desde aqui: vive en Vercel.
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
+}
+
+# Panel navegable de DRF tambien en produccion, para operar y revisar la API
+# desde el navegador. JSON va primero: los clientes (frontend, curl con
+# Accept: */*) siguen recibiendo JSON; solo un navegador pide text/html.
+# No relaja permisos: cada vista sigue exigiendo autenticacion y rol, y el
+# login del panel reutiliza la sesion (usuario = DNI).
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
 }

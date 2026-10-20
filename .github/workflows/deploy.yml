@@ -35,6 +35,12 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    # El entorno "production" deja historial de despliegues en GitHub y permite
+    # exigir aprobacion manual (Settings > Environments) sin tocar este archivo.
+    environment:
+      name: production
+      url: ${{ vars.WEB_BASE_URL || 'https://pharmacy-pos-gamma.vercel.app' }}
+    timeout-minutes: 20
     env:
       RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
       VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
@@ -75,8 +81,39 @@ jobs:
           echo "$health"
           echo "$health" | grep -q '"status": "ok"'
 
+      - name: Smoke test del panel navegable
+        run: |
+          # El login del panel usa la plantilla de DRF y debe responder 200.
+          # Se reintenta porque Render puede tardar en cambiar a la version nueva.
+          for attempt in $(seq 1 30); do
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' "$API_URL/api-auth/login/" || true)
+            if [ "$code" = "200" ]; then
+              echo "Panel navegable de DRF verificado (intento $attempt)."
+              exit 0
+            fi
+            echo "Intento $attempt: el panel respondio $code. Esperando 10s..."
+            sleep 10
+          done
+          echo "El panel no respondio 200 a tiempo." >&2
+          exit 1
+
       - name: Smoke test del frontend y su proxy a la API
         run: |
           curl --fail --silent --show-error "$WEB_URL/api/v1/auth/csrf/" | grep -q csrfToken
           curl --fail --silent --show-error --output /dev/null --write-out '%{http_code}\n' "$WEB_URL/" | grep -q 200
-          echo "Frontend y proxy /api verificados."
+          # El panel navegable tambien viaja por el proxy (/api-auth y /static).
+          ok=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error "$WEB_URL/api-auth/login/" | grep -q csrfmiddlewaretoken; then
+              ok=1
+              echo "Panel via Vercel verificado (intento $attempt)."
+              break
+            fi
+            echo "Intento $attempt: el panel aun no esta en Vercel. Esperando 10s..."
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "El panel no esta disponible a traves de Vercel." >&2
+            exit 1
+          fi
+          echo "Frontend y proxies /api, /api-auth y /static verificados."

@@ -319,3 +319,41 @@ suite queda en 111 metodos (~20 s) y la CI usa el mismo comando que un
 desarrollador. `--keepdb` conserva la base de pruebas entre corridas. Las
 pruebas de API obligan a pasar por HTTP real en vez de llamar servicios
 directamente.
+
+---
+
+## D22. Panel navegable de DRF tambien en produccion
+
+**Contexto.** Operar y revisar la API en la nube era adivinar: un `GET` en el
+navegador devolvia JSON o `404` sin forma comoda de ver rutas, campos y
+permisos. El settings de produccion publicaba la API **solo** como JSON.
+
+**Decision.** La API se publica en `Render` (no en Vercel: Vercel solo reenvia
+`/api/*`). En produccion se habilita el panel navegable de DRF:
+
+- `DEFAULT_RENDERER_CLASSES` es `[JSONRenderer, BrowsableAPIRenderer]`. **JSON
+  va primero**: el frontend, `curl` con `Accept: */*` y las exportaciones CSV
+  siguen recibiendo JSON; solo un navegador (que pide `text/html`) ve el panel.
+- `GET /api/v1/` es un indice (`api_root`) que enlaza las rutas principales,
+  resuelto con `reverse` para que renombrar una ruta rompa el indice y lo
+  detecten las pruebas.
+- El login del panel vive en `/api-auth/login/` y publica los nombres
+  `rest_framework:login` / `rest_framework:logout` que espera su plantilla. No se
+  usa `rest_framework.urls` porque su vista de Django no tiene *throttling* ni
+  deja rastro en la auditoria: se usa una vista propia que reutiliza la **misma
+  sesion y el mismo usuario** (username = DNI) y conserva el limite de 10
+  intentos por minuto por IP y los eventos `LOGIN_SUCCESS`, `LOGIN_FAILED` y
+  `LOGOUT`.
+- No se agrego JWT ni *tokens*: el proyecto ya eligio sesion en cookie (D2) y
+  otra via de autenticacion seria una puerta nueva que auditar.
+- El proxy de Vercel reenvia tambien `/api-auth/*` y `/static/*` a Render (con
+  cache inmutable para los archivos con hash), asi el panel funciona completo,
+  con estilos, tanto en el dominio de Render como en el de la aplicacion.
+- `LOGIN_REDIRECT_URL` y `LOGOUT_REDIRECT_URL` apuntan al indice.
+
+**Consecuencia.** El panel **no relaja permisos**: cada vista sigue exigiendo
+sesion y rol, y las escrituras siguen exigiendo `X-CSRFToken`; el navegable solo
+cambia la representacion. `manage.py check --deploy` corre en la CI para vigilar
+los ajustes de produccion. Se puede abrir en
+`https://<servicio>.onrender.com/api/v1/` o en `https://<frontend>/api/v1/`; en
+el segundo caso comparte la cookie de sesion del frontend.

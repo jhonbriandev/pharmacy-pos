@@ -31,6 +31,28 @@ Peticion sin sesion: `403` (`not_authenticated`), porque DRF no distingue sin
 cabecera de autenticacion. Credenciales incorrectas en el login: `401`
 (`authentication_failed`).
 
+## Indice y panel navegable
+
+`GET /api/v1/` devuelve un indice con las rutas principales agrupadas
+(`autenticacion`, `usuarios`, `catalogo`, `inventario`, `ventas`, `reportes`,
+`auditoria`). Requiere sesion, igual que el resto.
+
+La misma API se puede recorrer desde el navegador con el **panel navegable de
+DRF** (disponible tambien en produccion):
+
+- Entra a `https://my-pos-api-2g1o.onrender.com/api/v1/` (o a
+  `https://pharmacy-pos-gamma.vercel.app/api/v1/`) y usa el enlace *Log in*
+  (`/api-auth/login/`); el usuario es el **DNI** y la contrasena la de la
+  aplicacion. Es la misma sesion, sin *tokens* aparte.
+- Ese login conserva las defensas de la API: 10 intentos por minuto por IP y
+  eventos de auditoria `LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGOUT`.
+- El panel solo cambia la representacion: no relaja permisos ni CSRF. Las
+  escrituras desde el formulario necesitan la cookie `csrftoken`.
+- Funciona con estilos en ambos dominios: Vercel reenvia `/api/*`, `/api-auth/*`
+  y `/static/*` a Render.
+- Los clientes siguen recibiendo JSON: `JSONRenderer` va primero y el navegable
+  solo responde a `Accept: text/html`.
+
 ## Formato de error
 
 ```json

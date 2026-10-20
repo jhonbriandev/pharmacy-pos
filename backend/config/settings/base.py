@@ -137,6 +137,10 @@ CSRF_TRUSTED_ORIGINS = env("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 # Cookies "Secure" se activan en produccion (config/settings/prod.py).
 
+# Destino tras entrar o salir por el panel navegable de DRF (/api-auth/).
+LOGIN_REDIRECT_URL = "/api/v1/"
+LOGOUT_REDIRECT_URL = "/api/v1/"
+
 # ---------------------------------------------------------------------------
 # CORS (solo desarrollo y despliegues separados; en produccion se recomienda
 # el proxy de Vercel para que el navegador vea un unico origen)

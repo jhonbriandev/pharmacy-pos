@@ -58,6 +58,15 @@ jobs:
       - name: Formato
         run: ruff format --check .
 
+      - name: Seguridad (check --deploy)
+        # Verifica los ajustes de produccion (HTTPS, HSTS, cookies Secure...).
+        # Usa el settings de produccion con un secreto de mentira: no conecta a
+        # la base de datos ni publica nada.
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_SECRET_KEY: ci-check-deploy-clave-de-verificacion-sin-valor-real-0123456789abcdef
+        run: python manage.py check --deploy --fail-level WARNING
+
       - name: Pruebas
         run: python manage.py test -v 2
 

@@ -40,7 +40,7 @@ corregir—, no como un atajo para saltarse el diseno.
 |---|---|---|
 | Codigo escrito | a mano, por mi | en OpenCode, dirigido por mi |
 | Documentacion | segun el caso | decisiones y API documentadas desde el inicio |
-| Pruebas | segun el caso | 113 pruebas de backend + frontend |
+| Pruebas | segun el caso | 124 pruebas de backend + frontend |
 | Flujo de trabajo | escribir y probar | escribir, probar, medir y corregir en el mismo ciclo |
 
 El objetivo de este proyecto es demostrar que un flujo asistido por IA puede
@@ -215,7 +215,7 @@ cd ..\frontend
 npm run test
 ```
 
-- Backend: 113 pruebas que cubren servicios, API, transacciones y concurrencia
+- Backend: 124 pruebas que cubren servicios, API, transacciones y concurrencia
   (dos cajeros sobre el mismo lote). La matriz de 5 roles por endpoint y el
   recorrido de rutas se ejecutan con `subTest`, de modo que un fallo identifica
   el rol y la ruta exactos.
@@ -243,10 +243,13 @@ de variables estan en `docs/operacion.md`.
 El pipeline vive en `.github/workflows/` y no necesita pasos manuales:
 
 1. **`ci.yml`** corre en cada push y pull request hacia `main`/`develop`:
-   `ruff` + pruebas del backend contra PostgreSQL y lint + pruebas + build del
-   frontend. Si algo falla, el deploy no ocurre.
+   `ruff` + pruebas del backend contra PostgreSQL + `check --deploy` de
+   seguridad, y lint + pruebas + build del frontend. Si algo falla, el deploy no
+   ocurre.
 2. **`deploy.yml`** espera a que `ci.yml` termine en `success` sobre `main` y
    entonces despliega y verifica produccion (`/healthz`, proxy `/api`, portada).
+   Usa el entorno `production` de GitHub (historial de despliegues y, si lo
+   activas, aprobacion manual).
    - Despliega con **deploy hooks** si defines los secrets
      `RENDER_DEPLOY_HOOK_URL` y `VERCEL_DEPLOY_HOOK_URL` (Settings > Secrets and
      variables > Actions).
@@ -257,6 +260,16 @@ El pipeline vive en `.github/workflows/` y no necesita pasos manuales:
 
 Para que **solo Actions despliegue** (y no la integracion nativa a la vez),
 agrega los dos secrets y apaga *Auto-Deploy* en Render y en Vercel.
+
+### API navegable en produccion
+
+La API expuesta es la de **Render** (Vercel reenvia `/api/*`, `/api-auth/*` y
+`/static/*`). Ademas de JSON, responde el **panel navegable de DRF**: entra a
+`https://pharmacy-pos-gamma.vercel.app/api/v1/` o a
+`https://my-pos-api-2g1o.onrender.com/api/v1/`, pulsa *Log in*
+(`/api-auth/login/`) con tu **DNI** y contrasena, y recorre los endpoints desde
+el navegador. Es la misma sesion de la aplicacion (sin *tokens* aparte), no
+cambia permisos y el login conserva el limite de intentos y la auditoria.
 
 ---
 

@@ -8,7 +8,11 @@ Decisiones relevantes (ver docs/decisiones.md):
 """
 
 from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.views import LoginView as DjangoLoginView
+from django.contrib.auth.views import LogoutView as DjangoLogoutView
+from django.core.cache import cache
 from django.db.models import Q
+from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
@@ -31,13 +35,18 @@ from apps.accounts.serializers import (
     UserUpdateSerializer,
 )
 from apps.audit.models import AuditAction
-from apps.audit.services import record_event
+from apps.audit.services import get_client_ip, record_event
 from apps.common.exceptions import error_response
 from apps.common.pagination import StandardResultsSetPagination
 
 User = get_user_model()
 
 MAX_FAILED_ATTEMPTS_HINT = "Demasiados intentos fallidos. Espera un momento antes de reintentar."
+
+# Mismo limite que DEFAULT_THROTTLE_RATES["login"] (10/min), aplicado a la vista
+# de login del panel navegable (que es una vista de Django, no de DRF).
+PANEL_LOGIN_MAX_ATTEMPTS = 10
+PANEL_LOGIN_WINDOW_SECONDS = 60
 
 
 class CsrfView(APIView):
@@ -89,6 +98,76 @@ class LoginView(APIView):
             request=request,
         )
         return Response(UserSerializer(user).data)
+
+
+class PanelLoginView(DjangoLoginView):
+    """Login del panel navegable de DRF.
+
+    Usa la misma sesion y el mismo usuario que la aplicacion (username = DNI),
+    pero conserva las defensas del login de la API: limite de intentos por IP y
+    evento de auditoria. No se delega en ``rest_framework.urls`` porque esa
+    vista de Django no tiene throttling ni deja rastro en la auditoria.
+    """
+
+    template_name = "rest_framework/login.html"
+    redirect_authenticated_user = True
+
+    def _throttle_key(self) -> str:
+        ip = get_client_ip(self.request) or "desconocida"
+        return f"mypos:panel-login:{ip}"
+
+    def dispatch(self, request, *args, **kwargs):
+        if (
+            request.method == "POST"
+            and cache.get(self._throttle_key(), 0) >= PANEL_LOGIN_MAX_ATTEMPTS
+        ):
+            return HttpResponse(
+                "Demasiados intentos fallidos. Espera un minuto antes de reintentar.",
+                status=429,
+                content_type="text/plain; charset=utf-8",
+            )
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        key = self._throttle_key()
+        # cache.incr falla si la clave expiro entre el get y el incr.
+        if cache.add(key, 1, PANEL_LOGIN_WINDOW_SECONDS) is False:
+            try:
+                cache.incr(key)
+            except ValueError:
+                cache.set(key, 1, PANEL_LOGIN_WINDOW_SECONDS)
+        record_event(
+            action=AuditAction.LOGIN_FAILED,
+            actor=None,
+            after={"username": form.data.get("username", "")},
+            request=self.request,
+        )
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        cache.delete(self._throttle_key())
+        user = form.get_user()
+        record_event(
+            action=AuditAction.LOGIN_SUCCESS,
+            entity=user,
+            actor=user,
+            request=self.request,
+        )
+        return super().form_valid(form)
+
+
+class PanelLogoutView(DjangoLogoutView):
+    """Cierre de sesion desde el panel, auditado como el de la API."""
+
+    def post(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            record_event(
+                action=AuditAction.LOGOUT,
+                entity=request.user,
+                actor=request.user,
+                request=request,
+            )
+        return super().post(request, *args, **kwargs)
 
 
 class LogoutView(APIView):

@@ -9,7 +9,15 @@
       "destination": "https://my-pos-api-2g1o.onrender.com/api/$1"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/api-auth/(.*)",
+      "destination": "https://my-pos-api-2g1o.onrender.com/api-auth/$1"
+    },
+    {
+      "source": "/static/(.*)",
+      "destination": "https://my-pos-api-2g1o.onrender.com/static/$1"
+    },
+    {
+      "source": "/((?!api/|api-auth/|static/).*)",
       "destination": "/index.html"
     }
   ],
@@ -24,6 +32,24 @@
         {
           "key": "x-vercel-enable-rewrite-caching",
           "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/api-auth/(.*)",
+      "headers": [
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }

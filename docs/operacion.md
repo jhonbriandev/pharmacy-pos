@@ -108,11 +108,15 @@ backend vive en `frontend/vercel.json` (rewrite), no en variables.
 
 El pipeline esta en `.github/workflows/`:
 
-- **`ci.yml`** corre en cada push y pull request hacia `main`/`develop`: lint y
-  pruebas del backend contra PostgreSQL, y lint, pruebas y build del frontend.
+- **`ci.yml`** corre en cada push y pull request hacia `main`/`develop`: lint,
+  pruebas del backend contra PostgreSQL, `check --deploy` de seguridad y lint,
+  pruebas y build del frontend.
 - **`deploy.yml`** se dispara **solo si `ci.yml` termino en `success` sobre
   `main`**. Despliega con *deploy hooks* (si existen) y luego verifica que
   produccion responda: `/healthz`, el proxy `/api/v1/auth/csrf/` y la portada.
+  El trabajo usa el entorno `production` de GitHub: deja historial de
+  despliegues y permite exigir aprobacion manual (*Settings > Environments*)
+  sin editar el workflow.
 
 Para que sea Actions quien despliegue, crea los *deploy hooks* y guardalos como
 secretos del repositorio (**Settings > Secrets and variables > Actions**):
@@ -251,6 +255,22 @@ menos una vez antes de confiar en el.
 `check_consistency` compara `Lot.current_quantity` con la suma del libro de
 movimientos. Cualquier diferencia es un incidente: se investiga en
 `/audit-events/` y se corrige con un ajuste, nunca editando la cantidad a mano.
+
+### Panel navegable de la API
+
+La API de produccion incluye el panel navegable de DRF (ver D22). Para revisar
+endpoints, campos y permisos desde el navegador:
+
+1. Abre `https://my-pos-api-2g1o.onrender.com/api/v1/` (o
+   `https://pharmacy-pos-gamma.vercel.app/api/v1/`; Vercel reenvia `/api/*`,
+   `/api-auth/*` y `/static/*`, asi que el panel funciona igual en ambos).
+2. *Log in* → `/api-auth/login/` con el **DNI** y la contrasena de la
+   aplicacion. Es la misma sesion: no hay *tokens* aparte. El login tiene el
+   mismo limite de 10 intentos por minuto por IP y deja eventos de auditoria.
+3. `GET /api/v1/` es el indice; cada grupo enlaza sus colecciones.
+
+El panel no relaja nada: exige sesion y rol, y las escrituras siguen pidiendo
+`X-CSRFToken`.
 
 ## Seguridad
 
