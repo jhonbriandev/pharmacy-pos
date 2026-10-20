@@ -1,45 +1,81 @@
 name: Deploy
 
-# Despliegue automatico al hacer push a main.
+# Pipeline de produccion:
+#   1. `CI` corre lint y pruebas (backend + frontend).
+#   2. Este workflow se dispara solo si `CI` termino en success sobre `main`.
+#   3. Despliega con deploy hooks (si existen) y verifica que produccion
+#      responda (backend + frontend).
 #
-# Se apoya en los "Deploy Hooks" de Render y Vercel. La integracion nativa de
-# Git ya despliega sola; este workflow es para quien prefiera desplegar *solo*
-# despues de que la CI pase. Sin los secretos configurados no hace nada.
+# Secrets (Settings > Secrets and variables > Actions):
+#   RENDER_DEPLOY_HOOK_URL  -> Render: servicio > Settings > Deploy Hook
+#   VERCEL_DEPLOY_HOOK_URL  -> Vercel: proyecto > Settings > Git > Deploy Hook
 #
-#   RENDER_DEPLOY_HOOK_URL  -> Render: Settings > Deploy Hook
-#   VERCEL_DEPLOY_HOOK_URL  -> Vercel: Settings > Git > Deploy Hook
+# Variables opcionales (Settings > Variables):
+#   API_BASE_URL  -> por defecto, el backend en Render
+#   WEB_BASE_URL  -> por defecto, el frontend en Vercel
 #
-# Si además usas estos hooks, apaga "Auto-Deploy" en Render y en Vercel para no
-# desplegar dos veces por el mismo commit.
+# Si NO defines los secrets, el despliegue lo hace la integracion nativa de Git
+# y este workflow solo verifica que produccion siga en pie.
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-main
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Disparar despliegues
+    name: Desplegar y verificar produccion
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     env:
       RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
       VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+      API_URL: ${{ vars.API_BASE_URL || 'https://my-pos-api-2g1o.onrender.com' }}
+      WEB_URL: ${{ vars.WEB_BASE_URL || 'https://pharmacy-pos-gamma.vercel.app' }}
 
     steps:
-      - name: Backend (Render)
+      - name: Desplegar backend (Render)
         if: env.RENDER_HOOK != ''
         run: curl --fail --silent --show-error --request POST "$RENDER_HOOK"
 
-      - name: Frontend (Vercel)
+      - name: Desplegar frontend (Vercel)
         if: env.VERCEL_HOOK != ''
         run: curl --fail --silent --show-error --request POST "$VERCEL_HOOK"
 
-      - name: Sin hooks configurados
+      - name: Aviso si no hay deploy hooks
         if: env.RENDER_HOOK == '' && env.VERCEL_HOOK == ''
+        run: echo "Sin deploy hooks: despliega la integracion nativa de Git (auto-deploy)."
+
+      - name: Esperar a que la API responda
         run: |
-          echo "No hay deploy hooks configurados."
-          echo "El despliegue lo hacen las integraciones nativas de Git."
+          for attempt in $(seq 1 30); do
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' "$API_URL/healthz" || true)
+            if [ "$code" = "200" ]; then
+              echo "API en linea (intento $attempt)."
+              exit 0
+            fi
+            echo "Intento $attempt: la API respondio $code. Esperando 10s..."
+            sleep 10
+          done
+          echo "La API no respondio 200 a tiempo." >&2
+          exit 1
+
+      - name: Smoke test de la API
+        run: |
+          health=$(curl --fail --silent --show-error "$API_URL/healthz")
+          echo "$health"
+          echo "$health" | grep -q '"status": "ok"'
+
+      - name: Smoke test del frontend y su proxy a la API
+        run: |
+          curl --fail --silent --show-error "$WEB_URL/api/v1/auth/csrf/" | grep -q csrfToken
+          curl --fail --silent --show-error --output /dev/null --write-out '%{http_code}\n' "$WEB_URL/" | grep -q 200
+          echo "Frontend y proxy /api verificados."

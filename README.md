@@ -1,5 +1,8 @@
 # pharmacy-pos
 
+[![CI](https://github.com/jhonbriandev/pharmacy-pos/actions/workflows/ci.yml/badge.svg)](https://github.com/jhonbriandev/pharmacy-pos/actions/workflows/ci.yml)
+[![Deploy](https://github.com/jhonbriandev/pharmacy-pos/actions/workflows/deploy.yml/badge.svg)](https://github.com/jhonbriandev/pharmacy-pos/actions/workflows/deploy.yml)
+
 Punto de venta e inventario para farmacia: ventas, entradas y salidas de
 medicamentos con trazabilidad por lote y fecha de vencimiento, gestion de
 inventario, autenticacion por roles y dashboard para gerencia.
@@ -235,19 +238,62 @@ El navegador ve un solo origen: Vercel reenvia `/api/*` a Render, asi que la
 cookie de sesion viaja sin CORS ni `SameSite=None`. El paso a paso y la lista
 de variables estan en `docs/operacion.md`.
 
-### Despliegue continuo
+### Despliegue continuo (GitHub Actions)
 
-Cada push a `main` despliega solo, sin pasos manuales:
+El pipeline vive en `.github/workflows/` y no necesita pasos manuales:
 
-- **Frontend:** Vercel despliega en cada push a `main` (rama de produccion).
-- **Backend:** Render despliega en cada push a `main` (`autoDeploy: true` en
-  `render.yaml`). Solo reconstruye cuando cambian archivos del backend.
-- **Calidad:** `.github/workflows/ci.yml` corre lint y pruebas en `main` y
-  `develop` en cada push y pull request.
-- **Opcional:** `.github/workflows/deploy.yml` permite desplegar con *deploy
-  hooks* despues de que la CI pase. Se activa solo si defines los secretos
-  `RENDER_DEPLOY_HOOK_URL` y `VERCEL_DEPLOY_HOOK_URL` en GitHub; sin ellos no
-  hace nada.
+1. **`ci.yml`** corre en cada push y pull request hacia `main`/`develop`:
+   `ruff` + pruebas del backend contra PostgreSQL y lint + pruebas + build del
+   frontend. Si algo falla, el deploy no ocurre.
+2. **`deploy.yml`** espera a que `ci.yml` termine en `success` sobre `main` y
+   entonces despliega y verifica produccion (`/healthz`, proxy `/api`, portada).
+   - Despliega con **deploy hooks** si defines los secrets
+     `RENDER_DEPLOY_HOOK_URL` y `VERCEL_DEPLOY_HOOK_URL` (Settings > Secrets and
+     variables > Actions).
+   - Sin esos secrets no hace nada mas que verificar produccion; del despliegue
+     se encargan las integraciones nativas de Git:
+     - **Vercel** despliega en cada push a su rama de produccion (`main`).
+     - **Render** despliega en cada push a `main` (`autoDeploy: true`).
+
+Para que **solo Actions despliegue** (y no la integracion nativa a la vez),
+agrega los dos secrets y apaga *Auto-Deploy* en Render y en Vercel.
+
+---
+
+## Datos ficticios para probar
+
+El comando `seed` carga usuarios de todos los roles, catalogo con
+presentaciones (caja, blister, unidad), lotes con vencimientos variados
+(incluido uno vencido) y algunas ventas. Es **idempotente**.
+
+En desarrollo:
+
+```powershell
+cd backend
+python manage.py seed
+```
+
+En la nube (por ejemplo, Render **Shell**), donde `DEBUG=False`, hay que
+confirmar que es un entorno de demostracion:
+
+```powershell
+python manage.py seed --force
+```
+
+Usuarios que crea (contrasena `Farmacia2026`):
+
+| DNI | Rol |
+|---|---|
+| `10000001` | Administrador |
+| `10000002` | Regente |
+| `10000003` / `10000004` | Cajero |
+| `10000005` | Almacen |
+| `10000006` | Auditor |
+
+> **Cuidado:** las cuentas nuevas usan una contrasena conocida. El seed **nunca**
+> cambia la contrasena ni el rol de una cuenta que ya existe, pero si crea las
+> de demostracion en un entorno con datos reales, **desactivalas** antes de
+> abrirlo al publico (`is_active=False`, no se eliminan).
 
 ---
 

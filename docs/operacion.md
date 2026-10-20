@@ -104,20 +104,55 @@ backend vive en `frontend/vercel.json` (rewrite), no en variables.
 
 ## Despliegue
 
-### Despliegue continuo (sin pasos manuales)
+### Despliegue continuo (GitHub Actions)
 
-Cada push a `main` despliega solo:
+El pipeline esta en `.github/workflows/`:
 
-- **Vercel** despliega el frontend en cada push a su rama de produccion
-  (`main`). Se configura una sola vez en *Settings > Git > Production Branch*.
-- **Render** despliega el backend en cada push a `main`. El Blueprint lo
-  declara con `autoDeploy: true`; si el servicio se creo a mano, activa
-  *Settings > Build & Deploy > Auto-Deploy*.
-- La CI (`.github/workflows/ci.yml`) corre lint y pruebas en cada push y en
-  cada pull request, hacia `main` y `develop`.
-- Opcional: `.github/workflows/deploy.yml` dispara Render y Vercel con *deploy
-  hooks* (secretos `RENDER_DEPLOY_HOOK_URL` y `VERCEL_DEPLOY_HOOK_URL`). Si los
-  usas, apaga el Auto-Deploy nativo para no desplegar dos veces.
+- **`ci.yml`** corre en cada push y pull request hacia `main`/`develop`: lint y
+  pruebas del backend contra PostgreSQL, y lint, pruebas y build del frontend.
+- **`deploy.yml`** se dispara **solo si `ci.yml` termino en `success` sobre
+  `main`**. Despliega con *deploy hooks* (si existen) y luego verifica que
+  produccion responda: `/healthz`, el proxy `/api/v1/auth/csrf/` y la portada.
+
+Para que sea Actions quien despliegue, crea los *deploy hooks* y guardalos como
+secretos del repositorio (**Settings > Secrets and variables > Actions**):
+
+| Secreto | Donde se obtiene |
+|---|---|
+| `RENDER_DEPLOY_HOOK_URL` | Render: servicio > *Settings* > *Deploy Hook* |
+| `VERCEL_DEPLOY_HOOK_URL` | Vercel: proyecto > *Settings* > *Git* > *Deploy Hook* |
+
+Opcionalmente define las variables `API_BASE_URL` y `WEB_BASE_URL` para apuntar
+la verificacion a otros dominios.
+
+Sin esos secretos, el workflow solo verifica produccion; del despliegue se
+encargan las integraciones nativas de Git:
+
+- **Vercel** despliega en cada push a su rama de produccion (`main`); se
+  configura en *Settings > Git > Production Branch*.
+- **Render** despliega en cada push a `main` (`autoDeploy: true` en
+  `render.yaml`); si el servicio se creo a mano, activa *Settings > Build &
+  Deploy > Auto-Deploy*.
+
+Si usas los *deploy hooks*, apaga el Auto-Deploy nativo para no desplegar dos
+veces por el mismo commit.
+
+### Datos ficticios en produccion (demostracion)
+
+Para probar la aplicacion desplegada, abre el **Shell** del servicio en Render y
+ejecuta:
+
+```bash
+python manage.py seed --force
+```
+
+`--force` es obligatorio cuando `DEBUG=False`. Crea usuarios de todos los roles,
+catalogo, lotes (uno vencido, para ver la alerta) y ventas de ejemplo. Es
+idempotente y **nunca** cambia la contrasena ni el rol de una cuenta que ya
+existe: solo fija la contrasena `Farmacia2026` en las cuentas que crea.
+
+> Las cuentas de demostracion quedan con una contrasena conocida. Antes de
+> cargar datos reales, desactivalas (no se borran): `is_active=False`.
 
 ### Backend en Render
 
