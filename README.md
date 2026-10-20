@@ -1,4 +1,4 @@
-# my-pos
+# pharmacy-pos
 
 Punto de venta e inventario para farmacia: ventas, entradas y salidas de
 medicamentos con trazabilidad por lote y fecha de vencimiento, gestion de
@@ -7,6 +7,43 @@ inventario, autenticacion por roles y dashboard para gerencia.
 - **Contexto:** una sola sucursal, un solo almacen, Peru.
 - **Moneda:** Soles (S/). **Impuestos:** precios con IGV incluido.
 - **Idioma:** espanol (Peru). **Fechas:** dd/mm/yyyy.
+
+---
+
+## Sobre este proyecto
+
+`pharmacy-pos` es un proyecto **construido en OpenCode**, el agente de IA para
+programar. Es el tercer proyecto de mi portafolio y el primero que no escribi
+linea por linea a mano: **los otros dos los desarrolle enteramente con codigo
+propio, sin asistencia**. Este siguio un flujo distinto.
+
+### Como se construyo
+
+- **Mi parte:** el problema de negocio (una farmacia en Peru, con IGV incluido,
+  trazabilidad por lote y vencimiento, fraccionamiento caja -> blister ->
+  unidad, cinco roles) y las decisiones de producto.
+- **La parte de OpenCode:** proponer la arquitectura, escribir el backend y el
+  frontend, disenar las pruebas, ejecutarlas y mantener la documentacion.
+
+No fue "generar codigo y pegarlo": cada decision quedo registrada y justificada
+en `docs/decisiones.md`, el backend se prueba contra PostgreSQL real y un fallo
+de concurrencia (dos cajeros vendiendo el mismo lote) esta cubierto por una
+prueba. OpenCode se uso como una herramienta de ingenieria —explorar, medir,
+corregir—, no como un atajo para saltarse el diseno.
+
+### En que se diferencia de mis otros dos proyectos
+
+| | Otros 2 proyectos | pharmacy-pos |
+|---|---|---|
+| Codigo escrito | a mano, por mi | en OpenCode, dirigido por mi |
+| Documentacion | segun el caso | decisiones y API documentadas desde el inicio |
+| Pruebas | segun el caso | 113 pruebas de backend + frontend |
+| Flujo de trabajo | escribir y probar | escribir, probar, medir y corregir en el mismo ciclo |
+
+El objetivo de este proyecto es demostrar que un flujo asistido por IA puede
+sostener el mismo nivel de exigencia que el codigo propio: pruebas que fallan
+cuando algo se rompe, decisiones explicadas y despliegue en produccion real
+(Render + Vercel + PostgreSQL).
 
 ---
 
@@ -21,7 +58,7 @@ inventario, autenticacion por roles y dashboard para gerencia.
 | 5. Frontend | listo |
 | 6. Integraciones externas | no aplica al MVP (sin pasarela de pago ni correo) |
 | 7. Pruebas y seguridad | listo |
-| 8. Despliegue | configurado (Render + Vercel) |
+| 8. Despliegue | listo (Render + Vercel + Neon) |
 | 9. Documentacion final | listo |
 
 Pendiente de confirmar con la farmacia y su contador el tratamiento tributario
@@ -44,7 +81,7 @@ en `docs/decisiones.md` (D19).
 | Pruebas frontend | Vitest + Testing Library + MSW |
 | Formato frontend | Prettier |
 | Servidor de aplicacion | Gunicorn (solo en Linux/produccion) |
-| Despliegue | backend en Render, frontend en Vercel |
+| Despliegue | backend en Render, frontend en Vercel, base en Neon |
 
 ---
 
@@ -169,13 +206,13 @@ Abre <http://localhost:5173>.
 
 ```powershell
 cd backend
-.\\.venv\\Scripts\\python.exe manage.py test --keepdb
+.\.venv\Scripts\python.exe manage.py test --keepdb
 
-cd ..\\frontend
+cd ..\frontend
 npm run test
 ```
 
-- Backend: 111 pruebas que cubren servicios, API, transacciones y concurrencia
+- Backend: 113 pruebas que cubren servicios, API, transacciones y concurrencia
   (dos cajeros sobre el mismo lote). La matriz de 5 roles por endpoint y el
   recorrido de rutas se ejecutan con `subTest`, de modo que un fallo identifica
   el rol y la ruta exactos.
@@ -191,12 +228,26 @@ npm run test
 | Pieza | Donde | Configuracion |
 |---|---|---|
 | Backend | Render | `render.yaml` (Blueprint) |
-| Base de datos | Render o Neon | `DATABASE_URL` |
+| Base de datos | Neon | `DATABASE_URL` |
 | Frontend | Vercel | `frontend/vercel.json` (rewrite de `/api` al backend) |
 
 El navegador ve un solo origen: Vercel reenvia `/api/*` a Render, asi que la
 cookie de sesion viaja sin CORS ni `SameSite=None`. El paso a paso y la lista
 de variables estan en `docs/operacion.md`.
+
+### Despliegue continuo
+
+Cada push a `main` despliega solo, sin pasos manuales:
+
+- **Frontend:** Vercel despliega en cada push a `main` (rama de produccion).
+- **Backend:** Render despliega en cada push a `main` (`autoDeploy: true` en
+  `render.yaml`). Solo reconstruye cuando cambian archivos del backend.
+- **Calidad:** `.github/workflows/ci.yml` corre lint y pruebas en `main` y
+  `develop` en cada push y pull request.
+- **Opcional:** `.github/workflows/deploy.yml` permite desplegar con *deploy
+  hooks* despues de que la CI pase. Se activa solo si defines los secretos
+  `RENDER_DEPLOY_HOOK_URL` y `VERCEL_DEPLOY_HOOK_URL` en GitHub; sin ellos no
+  hace nada.
 
 ---
 

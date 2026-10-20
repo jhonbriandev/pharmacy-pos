@@ -104,6 +104,21 @@ backend vive en `frontend/vercel.json` (rewrite), no en variables.
 
 ## Despliegue
 
+### Despliegue continuo (sin pasos manuales)
+
+Cada push a `main` despliega solo:
+
+- **Vercel** despliega el frontend en cada push a su rama de produccion
+  (`main`). Se configura una sola vez en *Settings > Git > Production Branch*.
+- **Render** despliega el backend en cada push a `main`. El Blueprint lo
+  declara con `autoDeploy: true`; si el servicio se creo a mano, activa
+  *Settings > Build & Deploy > Auto-Deploy*.
+- La CI (`.github/workflows/ci.yml`) corre lint y pruebas en cada push y en
+  cada pull request, hacia `main` y `develop`.
+- Opcional: `.github/workflows/deploy.yml` dispara Render y Vercel con *deploy
+  hooks* (secretos `RENDER_DEPLOY_HOOK_URL` y `VERCEL_DEPLOY_HOOK_URL`). Si los
+  usas, apaga el Auto-Deploy nativo para no desplegar dos veces.
+
 ### Backend en Render
 
 1. Sube el repositorio a GitHub.

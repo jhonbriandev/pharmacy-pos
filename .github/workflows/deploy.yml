@@ -1,0 +1,45 @@
+name: Deploy
+
+# Despliegue automatico al hacer push a main.
+#
+# Se apoya en los "Deploy Hooks" de Render y Vercel. La integracion nativa de
+# Git ya despliega sola; este workflow es para quien prefiera desplegar *solo*
+# despues de que la CI pase. Sin los secretos configurados no hace nada.
+#
+#   RENDER_DEPLOY_HOOK_URL  -> Render: Settings > Deploy Hook
+#   VERCEL_DEPLOY_HOOK_URL  -> Vercel: Settings > Git > Deploy Hook
+#
+# Si además usas estos hooks, apaga "Auto-Deploy" en Render y en Vercel para no
+# desplegar dos veces por el mismo commit.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Disparar despliegues
+    runs-on: ubuntu-latest
+    env:
+      RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+
+    steps:
+      - name: Backend (Render)
+        if: env.RENDER_HOOK != ''
+        run: curl --fail --silent --show-error --request POST "$RENDER_HOOK"
+
+      - name: Frontend (Vercel)
+        if: env.VERCEL_HOOK != ''
+        run: curl --fail --silent --show-error --request POST "$VERCEL_HOOK"
+
+      - name: Sin hooks configurados
+        if: env.RENDER_HOOK == '' && env.VERCEL_HOOK == ''
+        run: |
+          echo "No hay deploy hooks configurados."
+          echo "El despliegue lo hacen las integraciones nativas de Git."
