@@ -33,6 +33,7 @@ from apps.accounts.serializers import (
 from apps.audit.models import AuditAction
 from apps.audit.services import record_event
 from apps.common.exceptions import error_response
+from apps.common.pagination import StandardResultsSetPagination
 
 User = get_user_model()
 
@@ -159,6 +160,7 @@ class UserListCreateView(APIView):
     """Listado y creacion de usuarios. Solo administracion."""
 
     permission_classes = [IsAdmin]
+    pagination_class = StandardResultsSetPagination
 
     def get(self, request):
         queryset = User.objects.all().order_by("last_name", "first_name")
@@ -176,7 +178,12 @@ class UserListCreateView(APIView):
                 | Q(last_name__icontains=search)
                 | Q(email__icontains=search)
             )
-        return Response(UserSerializer(queryset, many=True).data)
+        # El sobre paginado es el contrato de todos los listados de la API
+        # (ver docs/api.md); la pantalla de usuarios espera {count, results}.
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = UserSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
         serializer = UserCreateSerializer(data=request.data)

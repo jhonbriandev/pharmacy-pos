@@ -213,3 +213,28 @@ class AuthApiTests(BaseAPITestCase):
         event = AuditEvent.objects.get(action=AuditAction.ROLE_CHANGED)
         self.assertEqual(event.before, {"role": Role.CAJERO})
         self.assertEqual(event.after, {"role": Role.ALMACEN})
+
+    def test_user_list_returns_the_paginated_envelope(self):
+        response = self.api_for(self.admin_user).get("/api/v1/users/")
+
+        self.assertEqual(response.status_code, 200)
+        for key in ("count", "results", "next", "previous"):
+            self.assertIn(key, response.data)
+        self.assertEqual(response.data["count"], User.objects.count())
+        self.assertIsInstance(response.data["results"], list)
+        self.assertNotIn("password", response.data["results"][0])
+
+    def test_user_list_can_filter_by_role_and_search(self):
+        client = self.api_for(self.admin_user)
+
+        by_role = client.get("/api/v1/users/", {"role": Role.CAJERO})
+        self.assertEqual(by_role.status_code, 200)
+        self.assertTrue(by_role.data["results"])
+        self.assertTrue(all(row["role"] == Role.CAJERO for row in by_role.data["results"]))
+
+        by_search = client.get("/api/v1/users/", {"search": self.cashier_user.username})
+        self.assertEqual(by_search.status_code, 200)
+        self.assertEqual(
+            [row["username"] for row in by_search.data["results"]],
+            [self.cashier_user.username],
+        )
