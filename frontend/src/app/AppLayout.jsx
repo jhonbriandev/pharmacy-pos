@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LogOut, Menu, Plus, Settings, X } from "lucide-react";
+import { LogOut, Menu, Settings, X } from "lucide-react";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/features/auth/context";
@@ -12,9 +12,8 @@ function initials(fullName) {
 function Brand() {
   return (
     <Link to="/" className="flex items-center gap-2.5">
-      <span className="flex size-9 items-center justify-center rounded-lg bg-brand-700 text-white">
-        <Plus className="size-5" aria-hidden />
-      </span>
+      {/* Para cambiar el logo, reemplaza frontend/public/favicon.ico. */}
+      <img src="/favicon.ico" alt="" className="size-9 rounded-lg object-cover" />
       <span>
         <span className="block text-sm font-semibold tracking-[0.14em] text-slate-900 uppercase">
           my-pos
